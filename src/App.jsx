@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import mainImage from "./assets/mainImage.png";
 import {
   CalendarDays,
   Clock,
@@ -19,6 +20,7 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
+import InstagramSlider from "./components/ui/InstagramSlider";
 
 // --- proste narzędzia daty ---
 const pad = (n) => String(n).padStart(2, "0");
@@ -738,7 +740,15 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.1 }}
                   >
-                    <div className="aspect-[4/5] rounded-3xl bg-[url('https://images.unsplash.com/photo-1607746882042-944635dfe10e?q=80&w=1200&auto=format&fit=crop')] bg-cover bg-center shadow-xl" />
+                    <div
+                      className="aspect-[4/5] rounded-3xl bg-cover bg-center shadow-xl"
+                      style={{
+                        backgroundImage: `url(${new URL(
+                          "./assets/mainImage.png",
+                          import.meta.url
+                        )})`,
+                      }}
+                    />
                   </motion.div>
                 </div>
               </section>
@@ -818,11 +828,12 @@ export default function App() {
                   </div>
                 </div>
               </section>
-
+              <InstagramSlider />
               <Footer />
             </div>
           }
         />
+
         <Route
           path="/admin"
           element={

@@ -5,7 +5,6 @@ import {
   Clock,
   LogIn,
   MapPin,
-  Menu,
   Phone,
   X,
   ChevronLeft,
@@ -14,15 +13,17 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
 // --- proste narzędzia daty ---
 const pad = (n) => String(n).padStart(2, "0");
 const toKey = (d) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; // YYYY-MM-DD
-// const fromKey = (key) => {
-//   const [y, m, dd] = key.split("-").map(Number);
-//   return new Date(y, m - 1, dd);
-// };
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const endOfMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
 const addDays = (d, n) => {
@@ -30,14 +31,10 @@ const addDays = (d, n) => {
   nd.setDate(d.getDate() + n);
   return nd;
 };
-// const isSameDay = (a, b) =>
-//   a.getFullYear() === b.getFullYear() &&
-//   a.getMonth() === b.getMonth() &&
-//   a.getDate() === b.getDate();
 
 // --- pseudo API oparte o localStorage ---
-const LS_SLOTS = "essenza_slots_v1"; // { [dateKey]: ["09:00","09:30", ...] }
-const LS_BOOKINGS = "essenza_bookings_v1"; // [{id,dateKey,time,name,service,phone,email,note}]
+const LS_SLOTS = "essenza_slots_v1";
+const LS_BOOKINGS = "essenza_bookings_v1";
 
 const load = (k, fallback) => {
   try {
@@ -71,7 +68,11 @@ function useSlots() {
   useEffect(() => save(LS_BOOKINGS, bookings), [bookings]);
 
   const isBooked = (dateKey, time) =>
-    bookings.some((b) => b.dateKey === dateKey && b.time === time);
+    bookings.some(
+      (b) =>
+        b.dateKey === dateKey && b.time === time && b.status === "confirmed"
+    );
+
   const freeTimes = (dateKey) =>
     (slots[dateKey] || []).filter((t) => !isBooked(dateKey, t));
 
@@ -109,6 +110,7 @@ function useSlots() {
           typeof crypto !== "undefined" && crypto.randomUUID
             ? crypto.randomUUID()
             : String(Date.now()),
+        status: "pending", // domyślny status
         ...payload,
       },
     ]);
@@ -116,7 +118,19 @@ function useSlots() {
   };
 
   const cancelBooking = (id) =>
-    setBookings((prev) => prev.filter((b) => b.id !== id));
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, status: "canceled" } : b))
+    );
+
+  const updateBooking = (id, updates) =>
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...updates } : b))
+    );
+
+  const confirmBooking = (id) =>
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, status: "confirmed" } : b))
+    );
 
   return {
     slots,
@@ -126,6 +140,8 @@ function useSlots() {
     clearDay,
     createBooking,
     cancelBooking,
+    updateBooking,
+    confirmBooking, // nowa funkcja
   };
 }
 
@@ -144,7 +160,7 @@ function MonthCalendar({
   const days = useMemo(() => {
     const first = startOfMonth(cursor);
     const last = endOfMonth(cursor);
-    const startIdx = (first.getDay() + 6) % 7; // poniedziałek=0
+    const startIdx = (first.getDay() + 6) % 7;
     const total = startIdx + last.getDate();
     const rows = Math.ceil(total / 7);
     const grid = [];
@@ -240,7 +256,9 @@ function BookingForm({ date, freeTimes, onSubmit }) {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
-  const [done, setDone] = useState(false);
+
+  // nowy stan do przechowywania danych po wysłaniu
+  const [submitted, setSubmitted] = useState(null);
 
   const handle = (e) => {
     e.preventDefault();
@@ -253,7 +271,15 @@ function BookingForm({ date, freeTimes, onSubmit }) {
       email,
       note,
     });
-    if (ok) setDone(true);
+    if (ok) {
+      setSubmitted({
+        date,
+        time,
+        service,
+      });
+      // czyścimy wybór czasu, aby nie było w formularzu
+      setTime("");
+    }
   };
 
   if (!date)
@@ -262,15 +288,17 @@ function BookingForm({ date, freeTimes, onSubmit }) {
         Wybierz dzień w kalendarzu.
       </div>
     );
-  if (done)
+
+  if (submitted)
     return (
-      <div className="p-4 rounded-2xl bg-green-50 border border-green-200 text-green-800">
+      <div className="p-4 rounded-2xl bg-yellow-50 border border-yellow-200 text-yellow-800">
         <div className="font-medium flex items-center gap-2">
-          <CheckCircle2 /> Rezerwacja przyjęta!
+          <Clock /> Rezerwacja oczekuje na potwierdzenie
         </div>
         <div className="text-sm mt-1">
-          Szczegóły: {toKey(date)} {time} –{" "}
-          {SERVICES.find((s) => s.id === service)?.name}.
+          Twój termin: {toKey(submitted.date)} {submitted.time} –{" "}
+          {SERVICES.find((s) => s.id === submitted.service)?.name}.<br />
+          Rezerwacja będzie aktywna po zatwierdzeniu przez administratora.
         </div>
       </div>
     );
@@ -343,7 +371,7 @@ function BookingForm({ date, freeTimes, onSubmit }) {
 }
 
 // --- Panel administratora ---
-function AdminPanel({ onClose, slotsApi }) {
+function AdminPanel({ slotsApi }) {
   const [date, setDate] = useState(new Date());
   const [from, setFrom] = useState("10:00");
   const [to, setTo] = useState("18:00");
@@ -353,28 +381,13 @@ function AdminPanel({ onClose, slotsApi }) {
   const existing = slotsApi.slots[key] || [];
 
   return (
-    <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 font-semibold">
-            <ShieldCheck /> Panel administratora
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-neutral-100"
-          >
-            <X />
-          </button>
-        </div>
+    <div className="min-h-screen bg-[#faf7f4] p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <ShieldCheck /> Panel administratora
+        </h1>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <div className="text-sm mb-2 font-medium">Dzień pracy</div>
             <MonthCalendar
               value={date}
               onChange={setDate}
@@ -445,6 +458,9 @@ function AdminPanel({ onClose, slotsApi }) {
               <AdminBookings
                 bookings={slotsApi.bookings}
                 onCancel={slotsApi.cancelBooking}
+                onConfirm={(id) =>
+                  slotsApi.updateBooking(id, { status: "confirmed" })
+                }
               />
             </div>
           </div>
@@ -454,45 +470,205 @@ function AdminPanel({ onClose, slotsApi }) {
   );
 }
 
-function AdminBookings({ bookings, onCancel }) {
+function AdminBookings({ bookings, onCancel, onConfirm }) {
+  const [expandedId, setExpandedId] = useState(null);
+  const [filter, setFilter] = useState("all"); // all, pending, confirmed, canceled
+
+  const filtered = bookings.filter(
+    (b) => filter === "all" || b.status === filter
+  );
+
+  const statusOrder = { pending: 0, confirmed: 1, canceled: 2 };
+  const sorted = filtered.sort((a, b) => {
+    if (statusOrder[a.status] !== statusOrder[b.status]) {
+      return statusOrder[a.status] - statusOrder[b.status];
+    }
+    const dateA = new Date(`${a.dateKey}T${a.time}`);
+    const dateB = new Date(`${b.dateKey}T${b.time}`);
+    return dateB - dateA; // od najnowszych
+  });
+
   if (!bookings.length)
     return <div className="text-sm text-neutral-500">Brak rezerwacji.</div>;
+
   return (
-    <div className="space-y-2 max-h-64 overflow-auto pr-1">
-      {bookings
-        .slice()
-        .reverse()
-        .map((b) => (
-          <div
-            key={b.id}
-            className="flex items-center justify-between gap-3 rounded-xl border p-2"
+    <div className="space-y-2">
+      {/* Filtry */}
+      <div className="flex gap-2 mb-2 text-sm">
+        {["all", "pending", "confirmed", "canceled"].map((f) => (
+          <button
+            key={f}
+            className={`px-3 py-1 rounded-xl border ${
+              filter === f
+                ? "bg-neutral-900 text-white"
+                : "bg-white text-neutral-900"
+            }`}
+            onClick={() => setFilter(f)}
           >
-            <div className="text-sm">
-              <div className="font-medium">
-                {b.name} • {b.phone}
-              </div>
-              <div className="text-neutral-500">
-                {b.dateKey} {b.time} —{" "}
-                {SERVICES.find((s) => s.id === b.service)?.name}
-              </div>
-            </div>
-            <button
-              className="p-2 rounded-xl hover:bg-red-50 text-red-600"
-              onClick={() => onCancel(b.id)}
-              title="Anuluj"
-            >
-              <Trash2 />
-            </button>
-          </div>
+            {f === "all"
+              ? "Wszystkie"
+              : f === "pending"
+              ? "Oczekujące"
+              : f === "confirmed"
+              ? "Potwierdzone"
+              : "Anulowane"}
+          </button>
         ))}
+      </div>
+
+      {/* Lista rezerwacji */}
+      <div className="max-h-80 overflow-auto pr-1 space-y-2">
+        {sorted.map((b) => {
+          const expanded = expandedId === b.id;
+          return (
+            <div
+              key={b.id}
+              className="border rounded-xl cursor-pointer overflow-hidden"
+              onClick={() => setExpandedId(expanded ? null : b.id)}
+            >
+              <div className="flex items-center justify-between p-2">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  {b.name} • {b.phone} •{" "}
+                  <span
+                    className={
+                      b.status === "pending"
+                        ? "text-yellow-600"
+                        : b.status === "confirmed"
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }
+                  >
+                    {b.status === "pending"
+                      ? "Oczekuje"
+                      : b.status === "confirmed"
+                      ? "Potwierdzona"
+                      : "Anulowana"}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  {b.status === "pending" && (
+                    <button
+                      className="p-2 rounded-xl hover:bg-green-50 text-green-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onConfirm(b.id);
+                      }}
+                      title="Potwierdź"
+                    >
+                      <CheckCircle2 />
+                    </button>
+                  )}
+                  <button
+                    className="p-2 rounded-xl hover:bg-red-50 text-red-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCancel(b.id);
+                    }}
+                    title="Anuluj"
+                  >
+                    <Trash2 />
+                  </button>
+                </div>
+              </div>
+
+              {expanded && (
+                <div className="p-2 text-sm text-neutral-700 border-t bg-gray-50 rounded-b-xl">
+                  <div>
+                    <strong>Data i godzina:</strong> {b.dateKey} {b.time}
+                  </div>
+                  <div>
+                    <strong>Usługa:</strong>{" "}
+                    {SERVICES.find((s) => s.id === b.service)?.name}
+                  </div>
+                  <div>
+                    <strong>Email:</strong> {b.email || "Brak"}
+                  </div>
+                  <div>
+                    <strong>Telefon:</strong> {b.phone}
+                  </div>
+                  <div>
+                    <strong>Uwagi:</strong> {b.note || "Brak"}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
+  );
+}
+
+function AdminLogin({ onOK }) {
+  const [pwd, setPwd] = useState("");
+  const [error, setError] = useState("");
+  const submit = (e) => {
+    e.preventDefault();
+    if (pwd === "essenza123") onOK?.();
+    else setError("Nieprawidłowe hasło");
+  };
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#faf7f4]">
+      <div className="w-full max-w-sm rounded-3xl bg-white shadow-2xl p-6">
+        <h2 className="font-semibold flex items-center gap-2">
+          <LogIn /> Logowanie admin
+        </h2>
+        <form onSubmit={submit} className="space-y-3 mt-4">
+          <input
+            type="password"
+            className="border rounded-xl px-3 py-2 w-full"
+            placeholder="Hasło demo: essenza123"
+            value={pwd}
+            onChange={(e) => setPwd(e.target.value)}
+          />
+          <button className="w-full rounded-xl bg-neutral-900 text-white py-2.5">
+            Wejdź
+          </button>
+          {error && <div className="text-sm text-red-600">{error}</div>}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function Header() {
+  return (
+    <header className="sticky top-0 z-40 backdrop-blur bg-white/70 border-b">
+      <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
+        <a href="/" className="font-semibold tracking-tight">
+          ESSENZA AESTHETIC
+        </a>
+        <nav className="hidden md:flex items-center gap-6 text-sm">
+          <a href="#oferta" className="hover:opacity-70">
+            Oferta
+          </a>
+          <a href="#rezerwacja" className="hover:opacity-70">
+            Rezerwacja
+          </a>
+        </nav>
+      </div>
+    </header>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="border-t py-8 text-sm text-neutral-500">
+      <div className="max-w-6xl mx-auto px-5 flex items-center justify-between">
+        <div>
+          © {new Date().getFullYear()} Essenza Aesthetic • {brand.city}
+        </div>
+        <a href="#rezerwacja" className="rounded-xl border px-3 py-1.5">
+          Umów wizytę
+        </a>
+      </div>
+    </footer>
   );
 }
 
 // --- Główna aplikacja ---
 export default function App() {
   const slotsApi = useSlots();
-  const [adminOpen, setAdminOpen] = useState(false);
   const [authOK, setAuthOK] = useState(false);
 
   // Kalendarz klienta
@@ -513,254 +689,151 @@ export default function App() {
   const highlighted = selectedKey ? [selectedKey] : [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#faf7f4] to-white text-neutral-900">
-      <Header onAdmin={() => setAdminOpen(true)} />
+    <Router>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <div className="min-h-screen bg-gradient-to-b from-[#faf7f4] to-white text-neutral-900">
+              <Header />
 
-      {/* HERO */}
-      <section className="max-w-6xl mx-auto px-5 pt-20 pb-12">
-        <div className="grid md:grid-cols-2 gap-10 items-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <h1 className="text-4xl md:text-5xl font-semibold leading-tight">
-              {brand.name}
-              <br />— modelowanie ust & medycyna estetyczna w {brand.city}
-            </h1>
-            <p className="mt-4 text-neutral-600 max-w-xl">
-              Minimalistyczny gabinet, zaawansowane techniki, naturalne efekty.
-              Zarezerwuj termin online w kilka sekund.
-            </p>
-            <div className="mt-6 flex gap-3">
-              <a
-                href="#rezerwacja"
-                className="rounded-2xl bg-neutral-900 text-white px-6 py-3"
-              >
-                Umów wizytę
-              </a>
-              <a href="#oferta" className="rounded-2xl border px-6 py-3">
-                Zobacz ofertę
-              </a>
+              {/* HERO */}
+              <section className="max-w-6xl mx-auto px-5 pt-20 pb-12">
+                <div className="grid md:grid-cols-2 gap-10 items-center">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                  >
+                    <h1 className="text-4xl md:text-5xl font-semibold leading-tight">
+                      {brand.name}
+                      <br />— modelowanie ust & medycyna estetyczna w{" "}
+                      {brand.city}
+                    </h1>
+                    <p className="mt-4 text-neutral-600 max-w-xl">
+                      Minimalistyczny gabinet, zaawansowane techniki, naturalne
+                      efekty. Zarezerwuj termin online w kilka sekund.
+                    </p>
+                    <div className="mt-6 flex gap-3">
+                      <a
+                        href="#rezerwacja"
+                        className="rounded-2xl bg-neutral-900 text-white px-6 py-3"
+                      >
+                        Umów wizytę
+                      </a>
+                      <a
+                        href="#oferta"
+                        className="rounded-2xl border px-6 py-3"
+                      >
+                        Zobacz ofertę
+                      </a>
+                    </div>
+                    <div className="mt-6 flex items-center gap-2 text-sm text-neutral-600">
+                      <ShieldCheck className="w-4 h-4" /> Sterylność •
+                      Doświadczenie • Delikatne techniki
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.1 }}
+                  >
+                    <div className="aspect-[4/5] rounded-3xl bg-[url('https://images.unsplash.com/photo-1607746882042-944635dfe10e?q=80&w=1200&auto=format&fit=crop')] bg-cover bg-center shadow-xl" />
+                  </motion.div>
+                </div>
+              </section>
+
+              {/* OFERTA */}
+              <section id="oferta" className="max-w-6xl mx-auto px-5 py-12">
+                <h2 className="text-2xl font-semibold mb-6">Nasza oferta</h2>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {SERVICES.map((s) => (
+                    <div
+                      key={s.id}
+                      className="rounded-2xl border p-4 bg-white/60"
+                    >
+                      <div className="font-medium">{s.name}</div>
+                      <div className="text-2xl mt-2">{s.price} zł</div>
+                      <div className="text-sm text-neutral-600 mt-2">
+                        Konsultacja w cenie zabiegu. Naturalny efekt — bez
+                        przerysowania.
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* REZERWACJA */}
+              <section id="rezerwacja" className="max-w-6xl mx-auto px-5 py-12">
+                <div className="grid md:grid-cols-2 gap-8 items-start">
+                  <div className="space-y-3">
+                    <h2 className="text-2xl font-semibold flex items-center gap-2">
+                      <CalendarDays /> Rezerwacja online
+                    </h2>
+                    <p className="text-sm text-neutral-600">
+                      Wybierz dzień z wolnymi terminami (liczba wolnych slotów
+                      widoczna jako plakietka).
+                    </p>
+                    <MonthCalendar
+                      value={selectedDate || new Date()}
+                      onChange={setSelectedDate}
+                      highlightedKeys={highlighted}
+                      badgeMap={badgeMap}
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="font-medium flex items-center gap-2">
+                      <Clock /> Dostępne godziny
+                    </h3>
+                    <BookingForm
+                      date={selectedDate}
+                      freeTimes={free}
+                      onSubmit={(payload) => slotsApi.createBooking(payload)}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* LOKALIZACJA / KONTAKT */}
+              <section className="max-w-6xl mx-auto px-5 py-12">
+                <h2 className="text-2xl font-semibold mb-4">Kontakt</h2>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="rounded-2xl border p-4 bg-white/60">
+                    <div className="font-medium flex items-center gap-2">
+                      <Phone className="w-4 h-4" /> Telefon
+                    </div>
+                    <div className="text-lg">{brand.phone}</div>
+                  </div>
+                  <div className="rounded-2xl border p-4 bg-white/60">
+                    <div className="font-medium flex items-center gap-2">
+                      <MapPin className="w-4 h-4" /> Adres
+                    </div>
+                    <div>{brand.address}</div>
+                  </div>
+                  <div className="rounded-2xl border p-4 bg-white/60">
+                    <div className="font-medium">Godziny</div>
+                    <div className="text-sm text-neutral-600">
+                      Terminy ustalane wg kalendarza online
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <Footer />
             </div>
-            <div className="mt-6 flex items-center gap-2 text-sm text-neutral-600">
-              <ShieldCheck className="w-4 h-4" /> Sterylność • Doświadczenie •
-              Delikatne techniki
-            </div>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-          >
-            <div className="aspect-[4/5] rounded-3xl bg-[url('https://images.unsplash.com/photo-1607746882042-944635dfe10e?q=80&w=1200&auto=format&fit=crop')] bg-cover bg-center shadow-xl" />
-          </motion.div>
-        </div>
-      </section>
-
-      {/* OFERTA */}
-      <section id="oferta" className="max-w-6xl mx-auto px-5 py-12">
-        <h2 className="text-2xl font-semibold mb-6">Nasza oferta</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {SERVICES.map((s) => (
-            <div key={s.id} className="rounded-2xl border p-4 bg-white/60">
-              <div className="font-medium">{s.name}</div>
-              <div className="text-2xl mt-2">{s.price} zł</div>
-              <div className="text-sm text-neutral-600 mt-2">
-                Konsultacja w cenie zabiegu. Naturalny efekt — bez
-                przerysowania.
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* REZERWACJA */}
-      <section id="rezerwacja" className="max-w-6xl mx-auto px-5 py-12">
-        <div className="grid md:grid-cols-2 gap-8 items-start">
-          <div className="space-y-3">
-            <h2 className="text-2xl font-semibold flex items-center gap-2">
-              <CalendarDays /> Rezerwacja online
-            </h2>
-            <p className="text-sm text-neutral-600">
-              Wybierz dzień z wolnymi terminami (liczba wolnych slotów widoczna
-              jako plakietka).
-            </p>
-            <MonthCalendar
-              value={selectedDate || new Date()}
-              onChange={setSelectedDate}
-              highlightedKeys={highlighted}
-              badgeMap={badgeMap}
-            />
-          </div>
-          <div className="space-y-4">
-            <h3 className="font-medium flex items-center gap-2">
-              <Clock /> Dostępne godziny
-            </h3>
-            <BookingForm
-              date={selectedDate}
-              freeTimes={free}
-              onSubmit={(payload) => slotsApi.createBooking(payload)}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* LOKALIZACJA / KONTAKT */}
-      <section className="max-w-6xl mx-auto px-5 py-12">
-        <h2 className="text-2xl font-semibold mb-4">Kontakt</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="rounded-2xl border p-4 bg-white/60">
-            <div className="font-medium flex items-center gap-2">
-              <Phone className="w-4 h-4" /> Telefon
-            </div>
-            <div className="text-lg">{brand.phone}</div>
-          </div>
-          <div className="rounded-2xl border p-4 bg-white/60">
-            <div className="font-medium flex items-center gap-2">
-              <MapPin className="w-4 h-4" /> Adres
-            </div>
-            <div>{brand.address}</div>
-          </div>
-          <div className="rounded-2xl border p-4 bg-white/60">
-            <div className="font-medium">Godziny</div>
-            <div className="text-sm text-neutral-600">
-              Terminy ustalane wg kalendarza online
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <Footer />
-
-      {/* ADMIN */}
-      {adminOpen &&
-        (authOK ? (
-          <AdminPanel onClose={() => setAdminOpen(false)} slotsApi={slotsApi} />
-        ) : (
-          <AdminLogin
-            onClose={() => setAdminOpen(false)}
-            onOK={() => setAuthOK(true)}
-          />
-        ))}
-    </div>
-  );
-}
-
-function Header({ onAdmin }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <header className="sticky top-0 z-40 backdrop-blur bg-white/70 border-b">
-      <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
-        <a href="#" className="font-semibold tracking-tight">
-          ESSENZA AESTHETIC
-        </a>
-        <nav className="hidden md:flex items-center gap-6 text-sm">
-          <a href="#oferta" className="hover:opacity-70">
-            Oferta
-          </a>
-          <a href="#rezerwacja" className="hover:opacity-70">
-            Rezerwacja
-          </a>
-          <button
-            onClick={onAdmin}
-            className="rounded-full px-3 py-1.5 border text-xs flex items-center gap-1"
-          >
-            <ShieldCheck className="w-3 h-3" /> Admin
-          </button>
-        </nav>
-        <button className="md:hidden p-2" onClick={() => setOpen(!open)}>
-          {open ? <X /> : <Menu />}
-        </button>
-      </div>
-      {open && (
-        <div className="md:hidden px-5 pb-3 flex flex-col gap-2 text-sm">
-          <a
-            href="#oferta"
-            className="py-2 border-b"
-            onClick={() => setOpen(false)}
-          >
-            Oferta
-          </a>
-          <a
-            href="#rezerwacja"
-            className="py-2 border-b"
-            onClick={() => setOpen(false)}
-          >
-            Rezerwacja
-          </a>
-          <button
-            onClick={() => {
-              onAdmin();
-              setOpen(false);
-            }}
-            className="py-2 text-left"
-          >
-            Panel admina
-          </button>
-        </div>
-      )}
-    </header>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="border-t py-8 text-sm text-neutral-500">
-      <div className="max-w-6xl mx-auto px-5 flex items-center justify-between">
-        <div>
-          © {new Date().getFullYear()} Essenza Aesthetic • {brand.city}
-        </div>
-        <a href="#rezerwacja" className="rounded-xl border px-3 py-1.5">
-          Umów wizytę
-        </a>
-      </div>
-    </footer>
-  );
-}
-
-function AdminLogin({ onOK, onClose }) {
-  const [pwd, setPwd] = useState("");
-  const [error, setError] = useState("");
-  const submit = (e) => {
-    e.preventDefault();
-    if (pwd === "essenza123") onOK?.();
-    else setError("Nieprawidłowe hasło");
-  };
-  return (
-    <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-3xl bg-white shadow-2xl p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="font-semibold flex items-center gap-2">
-            <LogIn /> Logowanie admin
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-neutral-100"
-          >
-            <X />
-          </button>
-        </div>
-        <form onSubmit={submit} className="space-y-3">
-          <input
-            type="password"
-            className="border rounded-xl px-3 py-2 w-full"
-            placeholder="Hasło demo: essenza123"
-            value={pwd}
-            onChange={(e) => setPwd(e.target.value)}
-          />
-          <button className="w-full rounded-xl bg-neutral-900 text-white py-2.5">
-            Wejdź
-          </button>
-          {error && <div className="text-sm text-red-600">{error}</div>}
-        </form>
-      </div>
-    </div>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            authOK ? (
+              <AdminPanel onClose={() => {}} slotsApi={slotsApi} />
+            ) : (
+              <AdminLogin onOK={() => setAuthOK(true)} onClose={() => {}} />
+            )
+          }
+        />
+      </Routes>
+    </Router>
   );
 }

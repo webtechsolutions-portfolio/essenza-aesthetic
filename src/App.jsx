@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import mainImage from "./assets/mainImage.png";
 import {
@@ -7,7 +7,6 @@ import {
   LogIn,
   MapPin,
   Phone,
-  X,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -15,10 +14,9 @@ import {
   Trash2,
 } from "lucide-react";
 import {
-  BrowserRouter as Router,
+  HashRouter as Router,
   Routes,
   Route,
-  Navigate,
 } from "react-router-dom";
 import InstagramSlider from "./components/ui/InstagramSlider";
 

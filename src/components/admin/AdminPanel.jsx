@@ -1,17 +1,52 @@
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import MonthCalendar, {toKey} from "../common/MonthCalendar";
+import MonthCalendar, { toKey } from "../common/MonthCalendar";
 import AdminBookings from "./AdminBookings";
+import { SERVICES } from "../../constants/services";
 
 export default function AdminPanel({ slotsApi }) {
-  const normalizeDate = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const normalizeDate = (d) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const [date, setDate] = useState(normalizeDate(new Date()));
   const [from, setFrom] = useState("10:00");
   const [to, setTo] = useState("18:00");
   const [step, setStep] = useState(30);
 
-  const key = date.toISOString().split("T")[0]; // yyyy-mm-dd
-  const existing = slotsApi.slots[key] || [];
+  // stany dla ręcznej rezerwacji
+  const [manualName, setManualName] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
+  const [manualEmail, setManualEmail] = useState("");
+  const [manualNote, setManualNote] = useState("");
+  const [manualService, setManualService] = useState(SERVICES[0].id);
+  const [manualTime, setManualTime] = useState("");
+  const [manualDate, setManualDate] = useState(date);
+
+  const key = toKey(date);
+  const existing = slotsApi.freeTimes(key) || [];
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    if (!manualName || !manualPhone || !manualTime) return;
+
+    slotsApi.createBooking({
+      dateKey: toKey(manualDate),
+      time: manualTime,
+      service: manualService,
+      name: manualName,
+      phone: manualPhone,
+      email: manualEmail,
+      note: manualNote,
+      status: "confirmed", // od razu potwierdzona
+    });
+
+    // reset formularza
+    setManualName("");
+    setManualPhone("");
+    setManualEmail("");
+    setManualNote("");
+    setManualTime("");
+    setManualService(SERVICES[0].id);
+  };
 
   return (
     <div className="min-h-screen bg-[#faf7f4] p-6">
@@ -21,16 +56,20 @@ export default function AdminPanel({ slotsApi }) {
         </h1>
 
         <div className="grid md:grid-cols-2 gap-6">
-            <div className="h-[400px] overflow-hidden">
           {/* Kalendarz */}
-          <MonthCalendar
-  value={date}
-  onChange={(d) => setDate(normalizeDate(d))}
-  highlightedKeys={[toKey(date)]}
-/>
-</div>
+          <div className="h-[400px] overflow-hidden">
+            <MonthCalendar
+              value={date}
+              onChange={(d) => {
+                const normalized = normalizeDate(d);
+                setDate(normalized);
+                setManualDate(normalized);
+              }}
+              highlightedKeys={[toKey(date)]}
+            />
+          </div>
 
-          {/* Panel ustawień dnia */}
+          {/* Panel ustawień dnia i slotów */}
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-2">
               <input
@@ -92,6 +131,74 @@ export default function AdminPanel({ slotsApi }) {
                   </span>
                 )}
               </div>
+            </div>
+
+            {/* Ręczna rezerwacja */}
+            <div className="pt-4 border-t">
+              <div className="text-sm font-medium mb-2">
+                Dodaj ręczną rezerwację
+              </div>
+              <form onSubmit={handleManualSubmit} className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Imię i nazwisko"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  className="border rounded-xl px-3 py-2 w-full"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="Telefon"
+                  value={manualPhone}
+                  onChange={(e) => setManualPhone(e.target.value)}
+                  className="border rounded-xl px-3 py-2 w-full"
+                  required
+                />
+                <input
+                  type="email"
+                  placeholder="Email (opcjonalnie)"
+                  value={manualEmail}
+                  onChange={(e) => setManualEmail(e.target.value)}
+                  className="border rounded-xl px-3 py-2 w-full"
+                />
+                <textarea
+                  placeholder="Uwagi (opcjonalnie)"
+                  value={manualNote}
+                  onChange={(e) => setManualNote(e.target.value)}
+                  className="border rounded-xl px-3 py-2 w-full"
+                  rows={2}
+                />
+                <select
+                  value={manualService}
+                  onChange={(e) => setManualService(e.target.value)}
+                  className="border rounded-xl px-3 py-2 w-full"
+                >
+                  {SERVICES.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.price} zł
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={manualTime}
+                  onChange={(e) => setManualTime(e.target.value)}
+                  className="border rounded-xl px-3 py-2 w-full"
+                >
+                  <option value="">Godzina</option>
+                  {existing.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-neutral-900 text-white py-2.5 disabled:opacity-40"
+                >
+                  Dodaj rezerwację
+                </button>
+              </form>
             </div>
 
             {/* Lista rezerwacji */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+// eslint-disable-next-line react-refresh/only-export-components
 export { toKey };
 
 // --- proste narzędzia daty ---
@@ -13,7 +14,12 @@ const addDays = (d, n) => {
   return nd;
 };
 
-export default function MonthCalendar({ value, onChange, highlightedKeys = [], badgeMap = {} }) {
+export default function MonthCalendar({
+  value,
+  onChange,
+  highlightedKeys = [],
+  badgeMap = {},
+}) {
   const [cursor, setCursor] = useState(startOfMonth(value || new Date()));
 
   // Synchronizujemy cursor tylko gdy zmienia się value i różni się od aktualnego kursora
@@ -52,14 +58,18 @@ export default function MonthCalendar({ value, onChange, highlightedKeys = [], b
       <div className="flex items-center justify-between mb-3">
         <button
           className="p-2 rounded-xl hover:bg-neutral-100"
-          onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}
+          onClick={() =>
+            setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))
+          }
         >
           &#x2039; {/* ChevronLeft */}
         </button>
         <div className="font-medium capitalize">{monthLabel}</div>
         <button
           className="p-2 rounded-xl hover:bg-neutral-100"
-          onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}
+          onClick={() =>
+            setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))
+          }
         >
           &#x203A; {/* ChevronRight */}
         </button>
@@ -67,13 +77,17 @@ export default function MonthCalendar({ value, onChange, highlightedKeys = [], b
 
       <div className="grid grid-cols-7 text-xs text-neutral-500 mb-1">
         {["Pn", "Wt", "Śr", "Cz", "Pt", "Sb", "Nd"].map((d) => (
-          <div key={d} className="text-center py-1">{d}</div>
+          <div key={d} className="text-center py-1">
+            {d}
+          </div>
         ))}
       </div>
 
       <div className="grid grid-cols-7 gap-1">
         {days.flat().map((d) => {
-          const disabled = d.getMonth() !== cursor.getMonth() || d < new Date(new Date().toDateString());
+          const disabled =
+            d.getMonth() !== cursor.getMonth() ||
+            d < new Date(new Date().toDateString());
           const key = toKey(d);
           const highlighted = highlightedKeys.includes(key);
           const badge = badgeMap[key];
@@ -84,14 +98,22 @@ export default function MonthCalendar({ value, onChange, highlightedKeys = [], b
               disabled={disabled}
               onClick={() => onChange?.(d)}
               className={`relative aspect-square rounded-xl border text-sm flex items-center justify-center transition ${
-                disabled ? "opacity-30 cursor-not-allowed" : "hover:border-neutral-800"
-              } ${highlighted ? "border-neutral-900 bg-neutral-900 text-white" : "bg-white"}`}
+                disabled
+                  ? "opacity-30 cursor-not-allowed"
+                  : "hover:border-neutral-800"
+              } ${
+                highlighted
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : "bg-white"
+              }`}
             >
               {d.getDate()}
               {badge && (
                 <span
                   className={`absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full border ${
-                    highlighted ? "bg-white text-neutral-900" : "bg-neutral-900 text-white"
+                    highlighted
+                      ? "bg-white text-neutral-900"
+                      : "bg-neutral-900 text-white"
                   }`}
                 >
                   {badge}

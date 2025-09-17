@@ -15,7 +15,9 @@ export default function AdminBookings({ bookings, onCancel, onConfirm }) {
     if (statusOrder[a.status] !== statusOrder[b.status]) {
       return statusOrder[a.status] - statusOrder[b.status];
     }
-    return new Date(`${b.dateKey}T${b.time}`) - new Date(`${a.dateKey}T${a.time}`);
+    return (
+      new Date(`${b.dateKey}T${b.time}`) - new Date(`${a.dateKey}T${a.time}`)
+    );
   });
 
   if (!bookings.length)
@@ -49,12 +51,12 @@ export default function AdminBookings({ bookings, onCancel, onConfirm }) {
       {/* Lista rezerwacji */}
       <div className="max-h-80 overflow-auto pr-1 space-y-2">
         {sorted.map((b) => {
-          const expanded = expandedId === b.id;
+          const expanded = expandedId === b._id;
           return (
             <div
-              key={b.id}
+              key={b._id}
               className="border rounded-xl cursor-pointer overflow-hidden"
-              onClick={() => setExpandedId(expanded ? null : b.id)}
+              onClick={() => setExpandedId(expanded ? null : b._id)}
             >
               <div className="flex items-center justify-between p-2">
                 <div className="text-sm font-medium flex items-center gap-2">
@@ -81,23 +83,25 @@ export default function AdminBookings({ bookings, onCancel, onConfirm }) {
                       className="p-2 rounded-xl hover:bg-green-50 text-green-600"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onConfirm(b.id);
+                        onConfirm(b._id);
                       }}
                       title="Potwierdź"
                     >
                       <CheckCircle2 />
                     </button>
                   )}
-                  <button
-                    className="p-2 rounded-xl hover:bg-red-50 text-red-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCancel(b.id);
-                    }}
-                    title="Anuluj"
-                  >
-                    <Trash2 />
-                  </button>
+                  {b.status !== "canceled" && (
+                    <button
+                      className="p-2 rounded-xl hover:bg-red-50 text-red-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCancel(b._id);
+                      }}
+                      title="Anuluj"
+                    >
+                      <Trash2 />
+                    </button>
+                  )}
                 </div>
               </div>
 

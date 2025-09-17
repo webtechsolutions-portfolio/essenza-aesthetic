@@ -23,9 +23,9 @@ export default function App() {
   const selectedKey = selectedDate ? toKey(selectedDate) : null;
   const free = selectedKey ? slotsApi.freeTimes(selectedKey) : [];
 
-  const badgeMap = Object.keys(slotsApi.slots).reduce((acc, k) => {
-    const freeCount = slotsApi.freeTimes(k).length;
-    if (freeCount > 0) acc[k] = String(freeCount);
+  const badgeMap = slotsApi.slots.reduce((acc, s) => {
+    const freeCount = slotsApi.freeTimes(s.dateKey).length;
+    if (freeCount > 0) acc[s.dateKey] = String(freeCount);
     return acc;
   }, {});
 

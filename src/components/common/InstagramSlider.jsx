@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import image1 from "../../assets/Pasted image (2).png";
 import image2 from "../../assets/Pasted image (3).png";

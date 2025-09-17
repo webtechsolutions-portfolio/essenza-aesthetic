@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShieldCheck } from "lucide-react";
 import MonthCalendar, { toKey } from "../common/MonthCalendar";
 import AdminBookings from "./AdminBookings";
@@ -12,7 +12,7 @@ export default function AdminPanel({ slotsApi }) {
   const [to, setTo] = useState("18:00");
   const [step, setStep] = useState(30);
 
-  // stany dla ręcznej rezerwacji
+  // ręczna rezerwacja
   const [manualName, setManualName] = useState("");
   const [manualPhone, setManualPhone] = useState("");
   const [manualEmail, setManualEmail] = useState("");
@@ -22,13 +22,21 @@ export default function AdminPanel({ slotsApi }) {
   const [manualDate, setManualDate] = useState(date);
 
   const key = toKey(date);
-  const existing = slotsApi.freeTimes(key) || [];
+  const [existing, setExisting] = useState([]);
 
-  const handleManualSubmit = (e) => {
+  // Fetch dostępnych slotów przy zmianie date
+  useEffect(() => {
+    const fetchSlots = async () => {
+      setExisting(slotsApi.freeTimes(toKey(manualDate)));
+    };
+    fetchSlots();
+  }, [slotsApi, manualDate, slotsApi.slots, slotsApi.bookings]);
+
+  const handleManualSubmit = async (e) => {
     e.preventDefault();
     if (!manualName || !manualPhone || !manualTime) return;
 
-    slotsApi.createBooking({
+    await slotsApi.createBooking({
       dateKey: toKey(manualDate),
       time: manualTime,
       service: manualService,
@@ -36,7 +44,7 @@ export default function AdminPanel({ slotsApi }) {
       phone: manualPhone,
       email: manualEmail,
       note: manualNote,
-      status: "confirmed", // od razu potwierdzona
+      status: "confirmed",
     });
 
     // reset formularza
@@ -46,6 +54,14 @@ export default function AdminPanel({ slotsApi }) {
     setManualNote("");
     setManualTime("");
     setManualService(SERVICES[0].id);
+  };
+
+  const handleAddWorkingDay = async () => {
+    await slotsApi.addWorkingDay(key, from, to, step);
+  };
+
+  const handleClearDay = async () => {
+    await slotsApi.clearDay(key);
   };
 
   return (
@@ -100,13 +116,13 @@ export default function AdminPanel({ slotsApi }) {
             <div className="flex gap-2">
               <button
                 className="rounded-xl bg-neutral-900 text-white px-4 py-2"
-                onClick={() => slotsApi.addWorkingDay(key, from, to, step)}
+                onClick={handleAddWorkingDay}
               >
                 Zapisz godziny pracy
               </button>
               <button
                 className="rounded-xl border px-4 py-2"
-                onClick={() => slotsApi.clearDay(key)}
+                onClick={handleClearDay}
               >
                 Wyczyść dzień
               </button>

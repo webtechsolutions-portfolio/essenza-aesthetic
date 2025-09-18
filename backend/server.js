@@ -1,5 +1,4 @@
-/* eslint-disable no-undef */
-import "dotenv/config"; // automatycznie ładuje .env
+import "dotenv/config";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -8,7 +7,16 @@ import Slot from "./models/Slot.js";
 import Booking from "./models/Booking.js";
 
 const app = express();
-app.use(cors());
+
+// --- CORS: pozwala tylko Twojemu frontendowi ---
+app.use(
+  cors({
+    origin: "https://webtechsolutions-portfolio.github.io",
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 // Połącz z MongoDB
@@ -49,7 +57,7 @@ app.delete("/api/slots/:dateKey", async (req, res) => {
 
 // --- BOOKINGS ---
 app.get("/api/bookings", async (req, res) => {
-  const bookings = await Booking.find(); // bez filtra
+  const bookings = await Booking.find();
   res.json(bookings);
 });
 

@@ -5,4 +5,4 @@ const slotSchema = new mongoose.Schema({
   times: [{ type: String }],
 });
 
-export default mongoose.model("Slot", slotSchema);
+export default mongoose.models.Slot || mongoose.model("Slot", slotSchema);

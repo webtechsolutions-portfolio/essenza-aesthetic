@@ -1,20 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+// Ustaw tutaj URL do Twojego backendu na Vercel
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  "https://essenza-aesthetic-p6gjqlor5-zeazelus-projects.vercel.app";
 
 export function useSlots() {
-  const [slots, setSlots] = useState([]); // [{ dateKey, times: [] }, ...]
+  const [slots, setSlots] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const normalizeSlotsResponse = (data) => {
-    // data może być:
-    // - tablicą [{dateKey,times},...]
-    // - obiektem { slots: { dateKey: [times] } }
-    // - obiektem mapą { dateKey: [times], ... }
     if (!data) return [];
     if (Array.isArray(data)) return data;
-    if (data.slots && Array.isArray(data.slots)) return data.slots;
     if (data.slots && typeof data.slots === "object") {
       return Object.entries(data.slots).map(([dateKey, times]) => ({
         dateKey,
@@ -22,7 +20,6 @@ export function useSlots() {
       }));
     }
     if (typeof data === "object") {
-      // treat as map
       return Object.entries(data).map(([dateKey, times]) => ({
         dateKey,
         times,
@@ -35,8 +32,7 @@ export function useSlots() {
     try {
       const res = await fetch(`${API_BASE}/api/slots`);
       const data = await res.json();
-      const arr = normalizeSlotsResponse(data);
-      setSlots(arr);
+      setSlots(normalizeSlotsResponse(data));
     } catch (err) {
       console.error("fetchSlots error", err);
       setSlots([]);
@@ -47,8 +43,7 @@ export function useSlots() {
     try {
       const res = await fetch(`${API_BASE}/api/bookings`);
       const data = await res.json();
-      const arr = Array.isArray(data) ? data : data?.bookings ?? [];
-      setBookings(arr);
+      setBookings(Array.isArray(data) ? data : data?.bookings ?? []);
     } catch (err) {
       console.error("fetchBookings error", err);
       setBookings([]);
@@ -65,7 +60,6 @@ export function useSlots() {
     refresh();
   }, [refresh]);
 
-  // --- helpers ---
   const freeTimes = (dateKey) => {
     const day = slots.find((s) => s.dateKey === dateKey);
     const daySlots = day?.times || [];
@@ -75,7 +69,6 @@ export function useSlots() {
     return daySlots.filter((t) => !booked.includes(t));
   };
 
-  // Ustaw listę godzin (zapisuje dokładną listę times)
   const setDaySlots = async (dateKey, times) => {
     try {
       const res = await fetch(`${API_BASE}/api/slots`, {
@@ -84,8 +77,6 @@ export function useSlots() {
         body: JSON.stringify({ dateKey, times }),
       });
       if (!res.ok) throw new Error("failed to save slots");
-
-      // zamiast kombinacji -> zawsze odśwież sloty
       await fetchSlots();
       return true;
     } catch (err) {
@@ -94,7 +85,6 @@ export function useSlots() {
     }
   };
 
-  // Generowanie zakresu po stronie klienta i zapis
   const addWorkingDay = async (
     dateKey,
     from = "09:00",

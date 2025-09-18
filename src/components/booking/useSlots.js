@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 
-// Ustaw tutaj URL do Twojego backendu na Vercel
-const API_BASE =
+// Backend URL (bez końcowego slasha)
+const API_BASE = (
   import.meta.env.VITE_API_BASE ||
-  "https://essenza-aesthetic-p6gjqlor5-zeazelus-projects.vercel.app";
+  "https://essenza-aesthetic-p6gjqlor5-zeazelus-projects.vercel.app"
+).replace(/\/+$/, "");
+
+// Funkcja do łączenia ścieżki z bazowym URL
+const api = (path) => `${API_BASE}/${path.replace(/^\/+/, "")}`;
 
 export function useSlots() {
   const [slots, setSlots] = useState([]);
@@ -30,7 +34,7 @@ export function useSlots() {
 
   const fetchSlots = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}api/slots`);
+      const res = await fetch(api("/api/slots"));
       const data = await res.json();
       setSlots(normalizeSlotsResponse(data));
     } catch (err) {
@@ -41,7 +45,7 @@ export function useSlots() {
 
   const fetchBookings = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}api/bookings`);
+      const res = await fetch(api("/api/bookings"));
       const data = await res.json();
       setBookings(Array.isArray(data) ? data : data?.bookings ?? []);
     } catch (err) {
@@ -71,7 +75,7 @@ export function useSlots() {
 
   const setDaySlots = async (dateKey, times) => {
     try {
-      const res = await fetch(`${API_BASE}api/slots`, {
+      const res = await fetch(api("/api/slots"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dateKey, times }),
@@ -108,7 +112,7 @@ export function useSlots() {
 
   const clearDay = async (dateKey) => {
     try {
-      const res = await fetch(`${API_BASE}api/slots/${dateKey}`, {
+      const res = await fetch(api(`/api/slots/${dateKey}`), {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("delete failed");
@@ -122,7 +126,7 @@ export function useSlots() {
 
   const createBooking = async (payload) => {
     try {
-      const res = await fetch(`${API_BASE}api/bookings`, {
+      const res = await fetch(api("/api/bookings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -138,7 +142,7 @@ export function useSlots() {
 
   const confirmBooking = async (_id) => {
     try {
-      const res = await fetch(`${API_BASE}api/bookings/${_id}/confirm`, {
+      const res = await fetch(api(`/api/bookings/${_id}/confirm`), {
         method: "PATCH",
       });
       const updated = await res.json();
@@ -152,7 +156,7 @@ export function useSlots() {
 
   const cancelBooking = async (_id) => {
     try {
-      const res = await fetch(`${API_BASE}api/bookings/${_id}/cancel`, {
+      const res = await fetch(api(`/api/bookings/${_id}/cancel`), {
         method: "PATCH",
       });
       const updated = await res.json();

@@ -40,6 +40,14 @@ export default function BookingForm({ date, freeTimes, onSubmit }) {
         Wybierz dzień w kalendarzu.
       </div>
     );
+
+  if (freeTimes.length === 0)
+    return (
+      <div className="text-sm text-neutral-500">
+        Brak wolnych terminów w tym dniu.
+      </div>
+    );
+
   if (submitted)
     return (
       <div className="p-4 rounded-2xl bg-yellow-50 border border-yellow-200 text-yellow-800">
@@ -73,6 +81,7 @@ export default function BookingForm({ date, freeTimes, onSubmit }) {
           value={time}
           onChange={(e) => setTime(e.target.value)}
           className="border rounded-xl px-3 py-2 w-full"
+          required
         >
           <option value="">Godzina</option>
           {freeTimes.map((t) => (

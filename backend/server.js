@@ -26,26 +26,19 @@ app.get("/api/slots", async (req, res) => {
 });
 
 app.post("/api/slots", async (req, res) => {
-  const { dateKey, from = "09:00", to = "17:00", step = 30 } = req.body;
-  const [fh, fm] = from.split(":").map(Number);
-  const [th, tm] = to.split(":").map(Number);
-  const start = fh * 60 + fm;
-  const end = th * 60 + tm;
-  const times = [];
-  for (let m = start; m < end; m += step) {
-    times.push(
-      `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(
-        2,
-        "0"
-      )}`
-    );
+  const { dateKey, times } = req.body;
+
+  if (!dateKey || !Array.isArray(times) || times.length === 0) {
+    return res.status(400).json({ error: "dateKey i times[] są wymagane" });
   }
-  const slot = await Slot.findOneAndUpdate(
+
+  const updated = await Slot.findOneAndUpdate(
     { dateKey },
     { dateKey, times },
     { upsert: true, new: true }
   );
-  res.json(slot);
+
+  res.json(updated);
 });
 
 app.delete("/api/slots/:dateKey", async (req, res) => {

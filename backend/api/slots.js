@@ -1,37 +1,49 @@
-import dbConnect from "../dbConnect.js";
+import mongoose from "mongoose";
 import Slot from "../models/Slot.js";
 
+const MONGO_URI = process.env.MONGO_URI;
+
+async function connectDB() {
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(MONGO_URI);
+  }
+}
+
 export default async function handler(req, res) {
-  await dbConnect();
+  await connectDB();
 
   const { method } = req;
+
+  // GET wszystkie sloty
   if (method === "GET") {
     const slots = await Slot.find({});
     const slotsObj = {};
     slots.forEach((s) => (slotsObj[s.dateKey] = s.times));
-    return res.json({ slots: slotsObj });
+    return res.status(200).json({ slots: slotsObj });
   }
 
+  // POST dodaj/aktualizuj sloty
   if (method === "POST") {
     const { dateKey, times } = req.body;
-    if (!dateKey || !Array.isArray(times))
+    if (!dateKey || !Array.isArray(times)) {
       return res.status(400).json({ error: "dateKey i times[] są wymagane" });
+    }
 
-    const slot = await Slot.findOneAndUpdate(
+    const updated = await Slot.findOneAndUpdate(
       { dateKey },
       { dateKey, times },
       { upsert: true, new: true }
     );
-    return res.json(slot);
+    return res.status(200).json(updated);
   }
 
+  // DELETE sloty dnia
   if (method === "DELETE") {
     const { dateKey } = req.query;
-    if (!dateKey) return res.status(400).json({ error: "dateKey wymagany" });
-
     await Slot.deleteOne({ dateKey });
-    return res.json({ message: "Deleted" });
+    return res.status(200).json({ message: "Deleted" });
   }
 
-  res.status(405).end();
+  res.setHeader("Allow", ["GET", "POST", "DELETE"]);
+  res.status(405).end(`Method ${method} Not Allowed`);
 }

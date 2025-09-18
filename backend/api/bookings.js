@@ -1,37 +1,47 @@
-import dbConnect from "../dbConnect.js";
+import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 
+const MONGO_URI = process.env.MONGO_URI;
+
+async function connectDB() {
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(MONGO_URI);
+  }
+}
+
 export default async function handler(req, res) {
-  await dbConnect();
+  await connectDB();
 
   const { method } = req;
 
+  // GET wszystkie rezerwacje
   if (method === "GET") {
     const bookings = await Booking.find({});
-    return res.json(bookings);
+    return res.status(200).json(bookings);
   }
 
+  // POST nowa rezerwacja
   if (method === "POST") {
     const booking = new Booking(req.body);
     await booking.save();
-    return res.json(booking);
+    return res.status(200).json(booking);
   }
 
+  // PATCH potwierdź / anuluj
   if (method === "PATCH") {
-    const { id, action } = req.query;
-    if (!id || !action)
-      return res.status(400).json({ error: "id i action wymagane" });
-
-    let update = {};
-    if (action === "confirm") update.status = "confirmed";
-    if (action === "cancel") update.status = "canceled";
-    if (!update.status)
-      return res.status(400).json({ error: "Nieznana akcja" });
-
-    const updated = await Booking.findByIdAndUpdate(id, update, { new: true });
-    if (!updated) return res.status(404).json({ error: "Booking not found" });
-    return res.json(updated);
+    const { id, action } = req.query; // action=confirm/cancel
+    if (!id || !["confirm", "cancel"].includes(action)) {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+    const status = action === "confirm" ? "confirmed" : "canceled";
+    const updated = await Booking.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+    return res.status(200).json(updated);
   }
 
-  res.status(405).end();
+  res.setHeader("Allow", ["GET", "POST", "PATCH"]);
+  res.status(405).end(`Method ${method} Not Allowed`);
 }

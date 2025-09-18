@@ -13,9 +13,11 @@ app.use(
   cors({
     origin: "https://webtechsolutions-portfolio.github.io",
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    credentials: true,
   })
 );
+
+// obsługa preflight (OPTIONS)
+app.options("*", cors());
 
 app.use(express.json());
 

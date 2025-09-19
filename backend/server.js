@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import mongoose from "mongoose";
+import cors from "cors";
 
 import Slot from "./models/Slot.js";
 import Booking from "./models/Booking.js";
@@ -8,7 +9,6 @@ import Booking from "./models/Booking.js";
 const app = express();
 
 // --- CORS: pozwala tylko Twojemu frontendowi ---
-const cors = require("cors");
 app.use(
   cors({
     origin: "*", // albo konkretny URL frontendu np. "https://twoj-frontend.vercel.app"

@@ -8,14 +8,20 @@ import Booking from "./models/Booking.js";
 
 const app = express();
 
-// --- CORS: pozwala tylko Twojemu frontendowi ---
+// --- CORS: tylko konkretne fronty ---
 app.use(
   cors({
-    origin: "*", // albo konkretny URL frontendu np. "https://twoj-frontend.vercel.app"
-    methods: "GET,POST,PUT,DELETE",
-    allowedHeaders: "Content-Type,Authorization",
+    origin: [
+      "http://localhost:5173", // dev
+      "https://essenza-frontend-57csy8vb7-zeazelus-projects.vercel.app", // produkcja (Vercel)
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Middleware do parsowania JSON
+app.use(express.json());
 
 // Połącz z MongoDB
 mongoose

@@ -9,17 +9,14 @@ import Booking from "./models/Booking.js";
 const app = express();
 
 // --- CORS: pozwala tylko Twojemu frontendowi ---
+const cors = require("cors");
 app.use(
   cors({
-    origin: "https://webtechsolutions-portfolio.github.io",
-    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    origin: "*", // albo konkretny URL frontendu np. "https://twoj-frontend.vercel.app"
+    methods: "GET,POST,PUT,DELETE",
+    allowedHeaders: "Content-Type,Authorization",
   })
 );
-
-// obsługa preflight (OPTIONS)
-app.options("*", cors());
-
-app.use(express.json());
 
 // Połącz z MongoDB
 mongoose

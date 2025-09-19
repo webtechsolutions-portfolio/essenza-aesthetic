@@ -1,7 +1,6 @@
 import "dotenv/config";
 import express from "express";
 import mongoose from "mongoose";
-import cors from "cors";
 
 import Slot from "./models/Slot.js";
 import Booking from "./models/Booking.js";

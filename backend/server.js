@@ -13,7 +13,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173", // dev
-      "https://essenza-frontend-ekch07hyj-zeazelus-projects.vercel.app", // produkcja (Vercel)
+      "https://essenza-frontend-64p1zmsbf-zeazelus-projects.vercel.app", // produkcja (Vercel)
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
